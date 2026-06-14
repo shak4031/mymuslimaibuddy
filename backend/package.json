@@ -1,0 +1,19 @@
+{
+  "name": "mymuslimaibuddy-backend",
+  "version": "1.0.0",
+  "description": "MyMuslimBuddy AI Assistant Backend",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "migrate": "node src/db.js migrate",
+    "seed": "node src/db.js seed"
+  },
+  "dependencies": {
+    "adhan": "3.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "uuid": "^11.1.0"
+  }
+}

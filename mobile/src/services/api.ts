@@ -1,5 +1,5 @@
 // API Service for MyMuslimBuddy
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://mymuslimaibuddy-production.up.railway.app/api/v1';
 const DEVICE_ID = 'default-device'; // Will be replaced with expo-device ID
 
 export const api = {

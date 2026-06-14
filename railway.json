@@ -1,9 +1,10 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
+  "rootDirectory": "backend",
   "build": {
     "builder": "NIXPACKS",
-    "root": "backend",
-    "buildCommand": "npm install"
+    "buildCommand": "npm install",
+    "watchPatterns": ["src/**/*", "package.json"]
   },
   "deploy": {
     "startCommand": "node src/index.js",

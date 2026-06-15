@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } 
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../src/services/api';
+import { scheduleAllPrayerNotifications, cancelAllNotifications, scheduleStreakCelebration } from '../src/services/notifications';
 
 type PrayerRecord = { prayer_name: string; status: string; prayed_at: string | null };
 type PrayerTimes = Record<string, string>;
@@ -27,6 +28,16 @@ export default function PrayersScreen() {
         setNextPrayer(result.data.nextPrayer);
         setProgress(result.data.progress);
         setStreak(result.data.streak);
+
+        // Schedule prayer notifications from the prayer times
+        if (result.data.prayerTimes) {
+          const times: Record<string, Date> = {};
+          for (const [name, time] of Object.entries(result.data.prayerTimes)) {
+            times[name] = new Date(time as string);
+          }
+          await cancelAllNotifications();
+          await scheduleAllPrayerNotifications(times, result.data.streak);
+        }
       }
     } catch (e) {
       // Offline
@@ -49,6 +60,12 @@ export default function PrayersScreen() {
         setProgress(result.data.progress);
         setStreak(result.data.streak);
         loadData();
+
+        // Celebrate milestones
+        if (result.data.streak >= 3 && result.data.streak % 1 === 0) {
+          scheduleStreakCelebration(result.data.streak, prayerName);
+        }
+
         setTimeout(() => setMessage(''), 4000);
       }
     } catch (e) {

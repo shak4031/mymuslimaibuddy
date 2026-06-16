@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { api } from '../src/services/api';
+import { api } from '../../src/services/api';
 
 type NextPrayer = { name: string; remainingMinutes: number };
 type TodayProgress = { prayed: number; total: number; percentage: number };

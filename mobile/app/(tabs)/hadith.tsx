@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { api } from '../src/services/api';
+import { useState, useEffect } from 'react';
+import { api } from '../../src/services/api';
 
 type HadithData = {
   arabic: string; translation: string; source: string; sourceArabic: string;
@@ -44,7 +44,7 @@ export default function HadithScreen() {
   }
 
   // Load default on first visit
-  useState(() => { loadHadith(); });
+  useEffect(() => { loadHadith(); }, []);
 
   return (
     <ScrollView style={styles.container}>

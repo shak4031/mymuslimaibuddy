@@ -1,8 +1,8 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
-import { api } from '../src/services/api';
-import { scheduleAllPrayerNotifications, cancelAllNotifications, scheduleStreakCelebration } from '../src/services/notifications';
+import { api } from '../../src/services/api';
+import { scheduleAllPrayerNotifications, cancelAllNotifications, scheduleStreakCelebration } from '../../src/services/notifications';
 
 type PrayerRecord = { prayer_name: string; status: string; prayed_at: string | null };
 type PrayerTimes = Record<string, string>;

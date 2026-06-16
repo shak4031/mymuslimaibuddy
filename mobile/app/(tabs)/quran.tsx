@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { api } from '../src/services/api';
+import { api } from '../../src/services/api';
 
 type SurahInfo = { id: number; name: string; englishName: string; arabicName: string; revelationType: string; ayahs: number; context: string };
 type AyahData = { number: number; arabic: string; transliteration: string; translation: string };

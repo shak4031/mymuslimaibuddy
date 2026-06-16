@@ -6,6 +6,7 @@ const quranRouter = require('./routes/quran');
 const hadithRouter = require('./routes/hadith');
 const buddyRouter = require('./routes/buddy');
 const preferenceRouter = require('./routes/preferences');
+const growthRouter = require('./routes/growth');
 const { getNextPrayer, getAllPrayerTimes } = require('./prayer-times');
 
 const app = express();
@@ -41,6 +42,7 @@ app.use(`${API_PREFIX}/quran`, quranRouter);
 app.use(`${API_PREFIX}/hadith`, hadithRouter);
 app.use(`${API_PREFIX}/buddy`, buddyRouter);
 app.use(`${API_PREFIX}/preferences`, preferenceRouter);
+app.use(`${API_PREFIX}/growth`, growthRouter);
 
 // Prayer times info (public, no auth needed)
 app.get('/api/v1/prayer-times', async (req, res) => {

@@ -1,7 +1,13 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { requestPermissions, scheduleDailyInspiration, addNotificationResponseListener } from '../src/services/notifications';
+import {
+  requestPermissions,
+  registerNotificationCategories,
+  addNotificationResponseListener,
+  handleNotificationResponse,
+  scheduleEveningReflection,
+} from '../src/services/notifications';
 import { router } from 'expo-router';
 
 // API base URL - will be configured via env or railway URL
@@ -14,17 +20,22 @@ export default function RootLayout() {
       // Request notification permissions
       const granted = await requestPermissions();
       if (granted) {
-        // Schedule daily inspiration notification (9 AM)
-        await scheduleDailyInspiration(9, 0);
-        console.log('[Notifications] Daily inspiration scheduled');
+        // Register action buttons (Mark Prayed, Snooze, Talk, etc.)
+        await registerNotificationCategories();
+
+        // Schedule evening reflection
+        await scheduleEveningReflection(getDeviceId(), 0);
+        console.log('[Layout-v2] Notification categories registered');
       }
 
-      // Handle notification taps — navigate to the right screen
-      const subscription = addNotificationResponseListener((response) => {
-        const data = response.notification.request.content.data;
-        if (data?.screen) {
-          router.push(`/${data.screen}`);
+      // Handle notification taps and action buttons
+      const subscription = addNotificationResponseListener(async (response) => {
+        const screen = await handleNotificationResponse(response);
+        if (screen) {
+          router.push(screen);
         }
+        // If screen is null (e.g. MARK_PRAYED action), we DON'T navigate
+        // — the prayer was marked silently without opening the app!
       });
 
       return () => subscription.remove();
@@ -44,6 +55,13 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="growth"
+          options={{
+            title: 'My Growth',
+            headerStyle: { backgroundColor: '#1B4332' },
+          }}
+        />
       </Stack>
     </>
   );

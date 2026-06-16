@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   calculation_method TEXT DEFAULT 'mwl',
   daily_hadith_enabled BOOLEAN DEFAULT TRUE,
   daily_ayah_enabled BOOLEAN DEFAULT TRUE,
+  metadata JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -100,6 +101,69 @@ CREATE INDEX IF NOT EXISTS idx_prayer_records_user_date ON prayer_records(user_i
 CREATE INDEX IF NOT EXISTS idx_prayer_records_status ON prayer_records(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_ai_interactions_user ON ai_interactions(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quran_progress_user ON quran_progress(user_id, surah_number);
+
+-- Character Growth & Spiritual Development Tracking
+CREATE TABLE IF NOT EXISTS character_growth (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  record_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  prayer_completion DECIMAL DEFAULT 0 CHECK (prayer_completion BETWEEN 0 AND 100),
+  patience_score DECIMAL DEFAULT 0 CHECK (patience_score BETWEEN 0 AND 10),
+  gratitude_score DECIMAL DEFAULT 0 CHECK (gratitude_score BETWEEN 0 AND 10),
+  kindness_score DECIMAL DEFAULT 0 CHECK (kindness_score BETWEEN 0 AND 10),
+  honesty_score DECIMAL DEFAULT 0 CHECK (honesty_score BETWEEN 0 AND 10),
+  family_score DECIMAL DEFAULT 0 CHECK (family_score BETWEEN 0 AND 10),
+  community_score DECIMAL DEFAULT 0 CHECK (community_score BETWEEN 0 AND 10),
+  self_reflection TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, record_date)
+);
+
+CREATE TABLE IF NOT EXISTS spiritual_milestones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  milestone_type TEXT NOT NULL CHECK (milestone_type IN (
+    'first_complete_day','three_day_streak','seven_day_streak',
+    'thirty_day_streak','first_quran_khatm','hundred_hadith',
+    'character_breakthrough','self_reported_growth'
+  )),
+  title TEXT NOT NULL,
+  description TEXT,
+  achieved_at TIMESTAMPTZ DEFAULT NOW(),
+  metadata JSONB DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS behavior_journal (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  entry_type TEXT NOT NULL CHECK (entry_type IN (
+    'daily_reflection','gratitude_note','kindness_act',
+    'patience_moment','family_moment','neighbor_deed',
+    'forgiveness','self_improvement','goal_setting'
+  )),
+  content TEXT NOT NULL,
+  ai_reflection TEXT,
+  is_private BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS notification_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  notification_type TEXT NOT NULL,
+  content_sent TEXT NOT NULL,
+  tone_used TEXT,
+  was_opened BOOLEAN DEFAULT FALSE,
+  action_taken TEXT,
+  opened_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_character_growth_user_date ON character_growth(user_id, record_date DESC);
+CREATE INDEX IF NOT EXISTS idx_spiritual_milestones_user ON spiritual_milestones(user_id, achieved_at DESC);
+CREATE INDEX IF NOT EXISTS idx_behavior_journal_user_date ON behavior_journal(user_id, entry_date DESC);
+CREATE INDEX IF NOT EXISTS idx_notification_log_user ON notification_log(user_id, created_at DESC);`
 `;
 
 async function migrate() {

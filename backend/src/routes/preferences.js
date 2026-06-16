@@ -51,6 +51,8 @@ router.put('/:deviceId', async (req, res) => {
       calculation_method,
       daily_hadith_enabled,
       daily_ayah_enabled,
+      growthFoci,
+      userRole,
     } = req.body;
 
     const user = await query('SELECT id FROM users WHERE device_id = $1', [deviceId]);
@@ -65,6 +67,7 @@ router.put('/:deviceId', async (req, res) => {
         calculation_method = COALESCE($3, calculation_method),
         daily_hadith_enabled = COALESCE($4, daily_hadith_enabled),
         daily_ayah_enabled = COALESCE($5, daily_ayah_enabled),
+        metadata = CASE WHEN $7::jsonb IS NOT NULL THEN metadata || $7::jsonb ELSE metadata END,
         updated_at = NOW()
       WHERE user_id = $6`,
       [
@@ -74,6 +77,7 @@ router.put('/:deviceId', async (req, res) => {
         daily_hadith_enabled !== undefined ? daily_hadith_enabled : null,
         daily_ayah_enabled !== undefined ? daily_ayah_enabled : null,
         user.rows[0].id,
+        (growthFoci || userRole) ? JSON.stringify({ growthFoci, userRole }) : null,
       ]
     );
 

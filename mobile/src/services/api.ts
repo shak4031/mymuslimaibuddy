@@ -99,6 +99,36 @@ export const api = {
     return this.put(`/preferences/${deviceId}`, prefs);
   },
 
+  // --- Growth & Character ---
+  async getGrowthOverview(deviceId: string) {
+    return this.get(`/growth/${deviceId}/overview`);
+  },
+
+  async addJournalEntry(deviceId: string, entryType: string, content: string, isPrivate = true) {
+    return this.post(`/growth/${deviceId}/reflect`, { entryType, content, isPrivate });
+  },
+
+  async setGrowthPreferences(deviceId: string, growthFoci: string[], userRole: string) {
+    return this.post(`/growth/${deviceId}/preferences`, { growthFoci, userRole });
+  },
+
+  async getGrowthPreferences(deviceId: string) {
+    return this.get(`/growth/${deviceId}/preferences`);
+  },
+
+  // --- Nudge & Notification Generation ---
+  async generateNudge(deviceId: string, context: {
+    contextType: string;
+    nextPrayer?: string;
+    prayerName?: string;
+    streak?: number;
+    timeOfDay?: string;
+    nudgeLevel?: number;
+    consecutiveMissed?: number;
+  }) {
+    return this.post(`/buddy/${deviceId}/generate-nudge`, context);
+  },
+
   // --- Health ---
   async healthCheck() {
     return this.get('/health');

@@ -198,6 +198,61 @@ router.get('/:deviceId/history', async (req, res) => {
   }
 });
 
+// Generate an AI-powered notification nudge
+router.post('/:deviceId/generate-nudge', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const {
+      contextType,
+      nextPrayer,
+      prayerName,
+      streak = 0,
+      timeOfDay = 'morning',
+      nudgeLevel = 1,
+      consecutiveMissed = 0,
+    } = req.body;
+
+    const user = await query('SELECT id FROM users WHERE device_id = $1', [deviceId]);
+    if (!user.rows.length) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Get user's growth foci and role from preferences
+    const prefs = await query(
+      `SELECT metadata FROM user_preferences WHERE user_id = $1`,
+      [user.rows[0].id]
+    );
+    const meta = prefs.rows[0]?.metadata || {};
+    const growthFoci = meta.growthFoci || [];
+    const userRole = meta.userRole || '';
+
+    const userContext = {
+      currentStreak: streak,
+      consecutiveMissedPrayers: consecutiveMissed,
+      timeOfDay: timeOfDay || getTimeOfDay(),
+      growthFoci,
+      userRole,
+      nextPrayer,
+      prayerName,
+      hoursSinceLastInteraction: nudgeLevel * 4,
+    };
+
+    const aiResult = await generateBuddyResponse(contextType, '', userContext);
+
+    res.json({
+      success: true,
+      data: {
+        content: aiResult.response || (aiResult.fallback ? aiResult.fallback[0] : null),
+        tone: aiResult.tone || 'encouraging',
+        aiAvailable: aiResult.success,
+      }
+    });
+  } catch (err) {
+    console.error('[Buddy/Nudge] Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 function getTimeOfDay() {
   const hour = new Date().getHours();
   if (hour < 12) return 'morning';

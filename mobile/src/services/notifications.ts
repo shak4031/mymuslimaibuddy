@@ -53,17 +53,17 @@ export async function requestPermissions(): Promise<boolean> {
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#1B4332',
-      sound: 'default',
+      // Sound managed by Android notification channel
     });
     await Notifications.setNotificationChannelAsync('daily-inspiration', {
       name: 'Daily Inspiration',
       importance: Notifications.AndroidImportance.DEFAULT,
-      sound: 'default',
+      // Sound managed by Android notification channel
     });
     await Notifications.setNotificationChannelAsync('growth-reflections', {
       name: 'Growth Reflections',
       importance: Notifications.AndroidImportance.DEFAULT,
-      sound: 'default',
+      // Sound managed by Android notification channel
     });
   }
 
@@ -245,7 +245,7 @@ async function scheduleSmartPrayerReminder(
         screen: 'prayers',
       },
       categoryIdentifier: 'prayer_reminder',
-      sound: 'default',
+      // Sound managed by Android notification channel
       ...(Platform.OS === 'android' ? { channelId: 'prayer-reminders' } : {}),
     },
     trigger: {
@@ -282,7 +282,7 @@ async function scheduleMorningConnection(
       body,
       data: { type: 'daily_inspiration', deviceId, screen: 'home' },
       categoryIdentifier: 'daily_reflection',
-      sound: 'default',
+      // Sound managed by Android notification channel
       ...(Platform.OS === 'android' ? { channelId: 'daily-inspiration' } : {}),
     },
     trigger: {
@@ -324,7 +324,7 @@ export async function scheduleGrowthMilestone(
       body,
       data: { type: 'growth_milestone', deviceId, screen: 'growth' },
       categoryIdentifier: 'growth_milestone',
-      sound: 'default',
+      // Sound managed by Android notification channel
       ...(Platform.OS === 'android' ? { channelId: 'growth-reflections' } : {}),
     },
     trigger: null, // Immediate
@@ -361,7 +361,7 @@ export async function scheduleEveningReflection(
       body,
       data: { type: 'evening_reflection', deviceId, screen: 'growth' },
       categoryIdentifier: 'daily_reflection',
-      sound: 'default',
+      // Sound managed by Android notification channel
       ...(Platform.OS === 'android' ? { channelId: 'growth-reflections' } : {}),
     },
     trigger: {
@@ -452,7 +452,7 @@ async function schedulePrayerCompletedCelebration(prayerName: string, deviceId: 
       title: '✅ Prayer Marked',
       body,
       data: { type: 'prayer_confirmation', deviceId, screen: 'prayers' },
-      sound: 'default',
+      // Sound managed by Android notification channel
       ...(Platform.OS === 'android' ? { channelId: 'prayer-reminders' } : {}),
     },
     trigger: { seconds: 2 }, // Small delay

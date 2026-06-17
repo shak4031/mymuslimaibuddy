@@ -55,6 +55,14 @@ export const api = {
     return this.get('/quran/random-ayah');
   },
 
+  async getAyah(surahId: number, ayahNumber: number) {
+    return this.get(`/quran/ayah/${surahId}/${ayahNumber}`);
+  },
+
+  async getNextAyah(surahId: number, currentAyah: number) {
+    return this.get(`/quran/next-ayah/${surahId}/${currentAyah}`);
+  },
+
   async recordQuranProgress(deviceId: string, surahNumber: number, ayahNumber: number) {
     return this.post(`/quran/${deviceId}/progress`, { surahNumber, ayahNumber });
   },

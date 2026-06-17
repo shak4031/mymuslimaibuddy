@@ -8,6 +8,7 @@ import {
   handleNotificationResponse,
   scheduleEveningReflection,
 } from '../src/services/notifications';
+import { api } from '../src/services/api';
 import { router } from 'expo-router';
 
 // API base URL - will be configured via env or railway URL
@@ -17,6 +18,15 @@ export const getDeviceId = () => 'default-device'; // Will be replaced with expo
 export default function RootLayout() {
   useEffect(() => {
     async function init() {
+      // Register device on the backend (so prayer APIs don't fail with "User not found")
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        await api.registerDevice(getDeviceId(), tz);
+        console.log('[Layout] Device registered');
+      } catch (e) {
+        console.log('[Layout] Device registration failed (will retry on API call)');
+      }
+
       // Request notification permissions
       const granted = await requestPermissions();
       if (granted) {
@@ -34,8 +44,6 @@ export default function RootLayout() {
         if (screen) {
           router.push(screen);
         }
-        // If screen is null (e.g. MARK_PRAYED action), we DON'T navigate
-        // — the prayer was marked silently without opening the app!
       });
 
       return () => subscription.remove();

@@ -61,69 +61,100 @@ router.get('/surahs/:id', (req, res) => {
 router.get('/random-ayah', async (req, res) => {
   try {
     const surah = ALL_SURAH_DATA[Math.floor(Math.random() * ALL_SURAH_DATA.length)];
-
-    // Pick a random ayah within that surah
     const ayahNumber = Math.floor(Math.random() * surah.ayahs) + 1;
-
-    // Fetch from Alquran.cloud API
-    const response = await fetch(
-      `https://api.alquran.cloud/v1/ayah/${surah.id}:${ayahNumber}/editions/quran-uthmani,en.transliteration,en.sahih`
-    );
-    const data = await response.json();
-
-    if (!data.data || data.data.length < 3) {
-      throw new Error('Incomplete API response');
-    }
-
-    res.json({
-      success: true,
-      data: {
-        surah: {
-          id: surah.id,
-          name: surah.name,
-          englishName: surah.englishName,
-          arabicName: surah.arabicName,
-          revelationType: surah.revelationType,
-          ayahs: surah.ayahs,
-          context: surah.context,
-        },
-        ayah: {
-          number: data.data[0].numberInSurah,
-          arabic: data.data[0].text,
-          transliteration: data.data[1].text,
-          translation: data.data[2].text,
-        },
-      }
-    });
+    return await fetchAndRespondAyah(surah.id, ayahNumber, res);
   } catch (err) {
     console.error('[Quran/Random] Error:', err.message);
-    // Fallback to built-in data if API fails
     const surah = ALL_SURAH_DATA[Math.floor(Math.random() * ALL_SURAH_DATA.length)];
     res.json({
       success: true,
       data: {
-        surah: {
-          id: surah.id,
-          name: surah.name,
-          englishName: surah.englishName,
-          arabicName: surah.arabicName,
-          revelationType: surah.revelationType,
-          ayahs: surah.ayahs,
-          context: surah.context,
-        },
-        ayah: {
-          number: 1,
-          arabic: '[Connect to internet for full Arabic text]',
-          transliteration: '[Connect to internet for transliteration]',
-          translation: `Recite from Surah ${surah.englishName} — a ${surah.revelationType} surah with ${surah.ayahs} verses.`,
-        },
-        note: 'Internet connection needed for full Quranic text. The surah information is available offline.',
+        surah: { id: surah.id, name: surah.name, englishName: surah.englishName, arabicName: surah.arabicName, revelationType: surah.revelationType, ayahs: surah.ayahs, context: surah.context },
+        ayah: { number: 1, arabic: '[Connect to internet for full Arabic text]', transliteration: '[Connect to internet for transliteration]', translation: 'Recite from Surah ' + surah.englishName + ' - a ' + surah.revelationType + ' surah with ' + surah.ayahs + ' verses.' },
+        note: 'Internet connection needed for full Quranic text.',
       }
     });
   }
 });
 
-// Track reading progress
+// Get a specific ayah
+router.get('/ayah/:surahId/:ayahNumber', async (req, res) => {
+  try {
+    const surahId = parseInt(req.params.surahId);
+    const ayahNumber = parseInt(req.params.ayahNumber);
+    const surah = ALL_SURAH_DATA.find(s => s.id === surahId);
+    if (!surah) {
+      return res.status(404).json({ success: false, error: 'Surah not found' });
+    }
+    if (ayahNumber < 1 || ayahNumber > surah.ayahs) {
+      return res.status(400).json({ success: false, error: 'Ayah must be between 1 and ' + surah.ayahs + ' for ' + surah.englishName });
+    }
+    return await fetchAndRespondAyah(surahId, ayahNumber, res);
+  } catch (err) {
+    console.error('[Quran/Ayah] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch ayah' });
+  }
+});
+
+// Get the next ayah in the same surah (for "continue reading")
+router.get('/next-ayah/:surahId/:currentAyah', async (req, res) => {
+  try {
+    const surahId = parseInt(req.params.surahId);
+    const currentAyah = parseInt(req.params.currentAyah);
+    const surah = ALL_SURAH_DATA.find(s => s.id === surahId);
+    if (!surah) {
+      return res.status(404).json({ success: false, error: 'Surah not found' });
+    }
+    const nextAyah = currentAyah + 1;
+    if (nextAyah > surah.ayahs) {
+      // Reached the end of this surah - go to next surah or wrap around
+      const nextSurahIndex = ALL_SURAH_DATA.findIndex(s => s.id === surahId) + 1;
+      if (nextSurahIndex >= ALL_SURAH_DATA.length) {
+        return await fetchAndRespondAyah(ALL_SURAH_DATA[0].id, 1, res);
+      }
+      return await fetchAndRespondAyah(ALL_SURAH_DATA[nextSurahIndex].id, 1, res);
+    }
+    return await fetchAndRespondAyah(surahId, nextAyah, res);
+  } catch (err) {
+    console.error('[Quran/NextAyah] Error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch next ayah' });
+  }
+});
+
+async function fetchAndRespondAyah(surahId, ayahNumber, res) {
+  const response = await fetch(
+    'https://api.alquran.cloud/v1/ayah/' + surahId + ':' + ayahNumber + '/editions/quran-uthmani,en.transliteration,en.sahih'
+  );
+  const data = await response.json();
+  if (!data.data || data.data.length < 3) {
+    throw new Error('Incomplete API response');
+  }
+  const surah = ALL_SURAH_DATA.find(s => s.id === surahId);
+  res.json({
+    success: true,
+    data: {
+      surah: {
+        id: surah.id,
+        name: surah.name,
+        englishName: surah.englishName,
+        arabicName: surah.arabicName,
+        revelationType: surah.revelationType,
+        ayahs: surah.ayahs,
+        context: surah.context,
+      },
+      ayah: {
+        number: data.data[0].numberInSurah,
+        arabic: data.data[0].text,
+        transliteration: data.data[1].text,
+        translation: data.data[2].text,
+      },
+      hasNext: ayahNumber < surah.ayahs,
+      nextAyahNumber: ayahNumber < surah.ayahs ? ayahNumber + 1 : null,
+    }
+  });
+}
+
+// Track reading progress// Track reading progress
 router.post('/:deviceId/progress', async (req, res) => {
   try {
     const { deviceId } = req.params;

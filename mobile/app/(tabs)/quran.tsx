@@ -7,12 +7,12 @@ type SurahInfo = { id: number; name: string; englishName: string; arabicName: st
 type AyahData = { number: number; arabic: string; transliteration: string; translation: string };
 
 export default function QuranScreen() {
-  const [ayah, setAyah] = useState<{ surah: SurahInfo; ayah: AyahData } | null>(null);
+  const [ayah, setAyah] = useState<{ surah: SurahInfo; ayah: AyahData; hasNext?: boolean; nextAyahNumber?: number | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showTranslation, setShowTranslation] = useState(true);
 
-  async function fetchAyah() {
+  async function fetchRandomAyah() {
     setLoading(true);
     setError('');
     try {
@@ -22,6 +22,28 @@ export default function QuranScreen() {
       }
     } catch (e: any) {
       setError('Could not fetch. Check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchNextAyah() {
+    if (!ayah) return;
+    const nextNum = ayah.nextAyahNumber;
+    if (!nextNum) {
+      // Reached end of surah — fetch first ayah of next surah
+      setError('Reached the end of ' + ayah.surah.englishName + '! Moving to next surah...');
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.getNextAyah(ayah.surah.id, ayah.ayah.number);
+      if (result.success) {
+        setAyah(result.data);
+        setError('');
+      }
+    } catch (e: any) {
+      setError('Could not fetch next ayah. Try again.');
     } finally {
       setLoading(false);
     }
@@ -39,7 +61,7 @@ export default function QuranScreen() {
 
       {/* Main Ayah Card */}
       {!ayah && !loading && (
-        <TouchableOpacity style={styles.startCard} onPress={fetchAyah}>
+        <TouchableOpacity style={styles.startCard} onPress={fetchRandomAyah}>
           <Text style={styles.startEmoji}>📖</Text>
           <Text style={styles.startTitle}>Read a random ayah</Text>
           <Text style={styles.startSub}>Tap to begin your daily Quran moment</Text>
@@ -57,7 +79,7 @@ export default function QuranScreen() {
         <View style={styles.errorCard}>
           <Ionicons name="cloud-offline" size={24} color="#D32F2F" />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchAyah}>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchRandomAyah}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -107,12 +129,33 @@ export default function QuranScreen() {
           </View>
 
           {/* Actions */}
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.moreButton} onPress={fetchAyah}>
+          <View style={styles.actionsRow}>
+            {/* Next Ayah in this Surah — Continue Reading */}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.nextButton]}
+              onPress={fetchNextAyah}
+            >
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+              <Text style={styles.actionButtonText}>
+                {ayah.hasNext ? 'Next Ayah' : 'Next Surah'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Random Ayah — Shuffle */}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.shuffleButton]}
+              onPress={fetchRandomAyah}
+            >
               <Ionicons name="shuffle" size={18} color="#fff" />
-              <Text style={styles.moreButtonText}>Another Ayah</Text>
+              <Text style={styles.actionButtonText}>Another Ayah</Text>
             </TouchableOpacity>
           </View>
+
+          {ayah.hasNext && (
+            <Text style={styles.progressHint}>
+              Ayah {ayah.ayah.number} of {ayah.surah.ayahs} in {ayah.surah.englishName}
+            </Text>
+          )}
         </>
       )}
 
@@ -127,127 +170,55 @@ export default function QuranScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F0F4F0',
-  },
+  container: { flex: 1, backgroundColor: '#F0F4F0' },
   headerCard: {
-    backgroundColor: '#1B4332',
-    padding: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    backgroundColor: '#1B4332', padding: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: 20,
   },
   headerTitle: { color: '#fff', fontSize: 28, fontWeight: '700' },
   headerSub: { color: '#A3D4B5', fontSize: 14, marginTop: 4 },
   startCard: {
-    backgroundColor: '#fff',
-    margin: 20,
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
+    backgroundColor: '#fff', margin: 20, borderRadius: 20, padding: 40, alignItems: 'center',
   },
   startEmoji: { fontSize: 48 },
   startTitle: { fontSize: 18, fontWeight: '700', color: '#1B4332', marginTop: 12 },
   startSub: { fontSize: 14, color: '#6C757D', marginTop: 4 },
-  loadingCard: {
-    backgroundColor: '#fff',
-    margin: 20,
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-  },
+  loadingCard: { backgroundColor: '#fff', margin: 20, borderRadius: 20, padding: 40, alignItems: 'center' },
   loadingText: { marginTop: 12, color: '#6C757D' },
   errorCard: {
-    backgroundColor: '#FFEBEE',
-    margin: 20,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
+    backgroundColor: '#FFEBEE', margin: 20, borderRadius: 16, padding: 20, alignItems: 'center',
   },
   errorText: { color: '#D32F2F', marginTop: 8, marginBottom: 12, textAlign: 'center' },
   retryButton: { backgroundColor: '#D32F2F', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
   retryText: { color: '#fff', fontWeight: '600' },
-  surahInfoCard: {
-    backgroundColor: '#fff',
-    margin: 16,
-    marginBottom: 0,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-  },
+  surahInfoCard: { backgroundColor: '#fff', margin: 16, marginBottom: 0, borderRadius: 16, padding: 20, alignItems: 'center' },
   surahName: { fontSize: 24, fontWeight: '700', color: '#1B4332', marginBottom: 4 },
   surahEnglish: { fontSize: 14, color: '#6C757D', marginBottom: 10 },
   surahMeta: { flexDirection: 'row', gap: 12 },
   surahMetaText: { fontSize: 12, color: '#6C757D' },
-  ayahCard: {
-    backgroundColor: '#fff',
-    margin: 16,
-    borderRadius: 16,
-    padding: 20,
-  },
-  ayahArabic: {
-    fontSize: 28,
-    lineHeight: 44,
-    textAlign: 'right',
-    color: '#1B4332',
-    marginBottom: 16,
-    fontFamily: 'System',
-    writingDirection: 'rtl',
-  },
-  ayahTransliteration: {
-    fontSize: 15,
-    color: '#495057',
-    fontStyle: 'italic',
-    lineHeight: 22,
-  },
-  translationToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 12,
-    gap: 4,
-  },
+  ayahCard: { backgroundColor: '#fff', margin: 16, borderRadius: 16, padding: 20 },
+  ayahArabic: { fontSize: 28, lineHeight: 44, textAlign: 'right', color: '#1B4332', marginBottom: 16, writingDirection: 'rtl' },
+  ayahTransliteration: { fontSize: 15, color: '#495057', fontStyle: 'italic', lineHeight: 22 },
+  translationToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginVertical: 12, gap: 4 },
   translationToggleText: { color: '#2D6A4F', fontSize: 13, fontWeight: '500' },
-  ayahTranslation: {
-    fontSize: 15,
-    color: '#212529',
-    lineHeight: 24,
-    backgroundColor: '#F8F9FA',
-    padding: 12,
-    borderRadius: 10,
-  },
-  contextCard: {
-    backgroundColor: '#E8F5E9',
-    margin: 16,
-    marginTop: 0,
-    borderRadius: 16,
-    padding: 20,
-  },
+  ayahTranslation: { fontSize: 15, color: '#212529', lineHeight: 24, backgroundColor: '#F8F9FA', padding: 12, borderRadius: 10 },
+  contextCard: { backgroundColor: '#E8F5E9', margin: 16, marginTop: 0, borderRadius: 16, padding: 20 },
   contextTitle: { fontSize: 16, fontWeight: '600', color: '#1B4332', marginBottom: 8 },
   contextText: { color: '#2D6A4F', fontSize: 14, lineHeight: 22 },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    margin: 16,
-    marginTop: 0,
+  actionsRow: {
+    flexDirection: 'row', justifyContent: 'center', gap: 12, margin: 16, marginTop: 0,
   },
-  moreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2D6A4F',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    gap: 8,
+  actionButton: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12,
+    borderRadius: 24, gap: 8,
   },
-  moreButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  nextButton: { backgroundColor: '#1B4332' },
+  shuffleButton: { backgroundColor: '#2D6A4F' },
+  actionButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  progressHint: {
+    textAlign: 'center', fontSize: 12, color: '#6C757D', marginTop: -8, marginBottom: 8,
+  },
   encouragementCard: {
-    backgroundColor: '#FFF8E1',
-    margin: 16,
-    marginTop: 0,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 30,
+    backgroundColor: '#FFF8E1', margin: 16, marginTop: 0, borderRadius: 12, padding: 14, marginBottom: 30,
   },
   encouragementText: { color: '#795548', fontSize: 13, lineHeight: 18, textAlign: 'center' },
 });

@@ -201,19 +201,9 @@ router.post('/:deviceId/mark', async (req, res) => {
       [user.rows[0].id, today]
     );
 
-    // Generate AI encouragement
-    const aiResult = await generateBuddyResponse('prayer_completed', '', {
-      prayerName,
-      currentStreak: parseInt(streak.rows[0]?.current_streak || '0'),
-    });
+    const streakVal = parseInt(streak.rows[0]?.current_streak || '0');
 
-    // Log interaction
-    await query(
-      `INSERT INTO ai_interactions (user_id, context_type, tone_used, user_message, ai_response)
-       VALUES ($1, 'prayer_completed', 'encouraging', $2, $3)`,
-      [user.rows[0].id, `Marked ${prayerName} as prayed`, aiResult.response || aiResult.fallback?.[0] || 'MashaAllah!']
-    );
-
+    // Respond immediately with prayer confirmation — don't wait for AI
     res.json({
       success: true,
       data: {
@@ -224,12 +214,89 @@ router.post('/:deviceId/mark', async (req, res) => {
           total: 5,
           percentage: Math.round((parseInt(todayPrayed.rows[0]?.count || '0') / 5) * 100),
         },
-        streak: parseInt(streak.rows[0]?.current_streak || '0'),
-        message: aiResult.response || aiResult.fallback?.[0] || 'MashaAllah!',
+        streak: streakVal,
+        message: 'MashaAllah! ✓',
+      }
+    });
+
+    // Fire-and-forget: AI encouragement + logging in background
+    generateBuddyResponse('prayer_completed', '', {
+      prayerName,
+      currentStreak: streakVal,
+    }).then(aiResult => {
+      query(
+        `INSERT INTO ai_interactions (user_id, context_type, tone_used, user_message, ai_response)
+         VALUES ($1, 'prayer_completed', 'encouraging', $2, $3)`,
+        [user.rows[0].id, `Marked ${prayerName} as prayed`, aiResult.response || aiResult.fallback?.[0] || 'MashaAllah!']
+      ).catch(e => console.error('[Prayers/Mark-AI] Log error:', e.message));
+    }).catch(e => console.error('[Prayers/Mark-AI] Error:', e.message));
+  } catch (err) {
+    console.error('[Prayers/Mark] Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Undo / unmark a prayer — revert from 'prayed' back to 'pending'
+router.post('/:deviceId/unmark', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { prayerName } = req.body;
+
+    if (!['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'fajr_sunnah', 'dhuhr_sunnah', 'witr'].includes(prayerName)) {
+      return res.status(400).json({ success: false, error: 'Invalid prayer name' });
+    }
+
+    const user = await query('SELECT id FROM users WHERE device_id = $1', [deviceId]);
+    if (!user.rows.length) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    await query(
+      `UPDATE prayer_records SET status = 'pending', prayed_at = NULL, updated_at = NOW()
+       WHERE user_id = $1 AND prayer_name = $2 AND prayer_date = $3`,
+      [user.rows[0].id, prayerName, today]
+    );
+
+    // Recalculate progress after undo
+    const [streakResult, todayPrayed] = await Promise.all([
+      query(
+        `WITH daily_counts AS (
+           SELECT prayer_date, COUNT(*) FILTER (WHERE status = 'prayed') = 5 AS all_prayed
+           FROM prayer_records WHERE user_id = $1
+           GROUP BY prayer_date ORDER BY prayer_date DESC
+         )
+         SELECT COUNT(*) AS current_streak FROM (
+           SELECT prayer_date, all_prayed,
+                  SUM(CASE WHEN all_prayed THEN 0 ELSE 1 END) OVER (ORDER BY prayer_date DESC ROWS UNBOUNDED PRECEDING) AS break_group
+           FROM daily_counts
+         ) sub WHERE all_prayed = true AND break_group = 0`,
+        [user.rows[0].id]
+      ),
+      query(
+        `SELECT COUNT(*) FILTER (WHERE status = 'prayed') AS count FROM prayer_records
+         WHERE user_id = $1 AND prayer_date = $2`,
+        [user.rows[0].id, today]
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        prayer: prayerName,
+        status: 'pending',
+        progress: {
+          today: parseInt(todayPrayed.rows[0]?.count || '0'),
+          total: 5,
+          percentage: Math.round((parseInt(todayPrayed.rows[0]?.count || '0') / 5) * 100),
+        },
+        streak: parseInt(streakResult.rows[0]?.current_streak || '0'),
+        message: 'Undone ✓',
       }
     });
   } catch (err) {
-    console.error('[Prayers/Mark] Error:', err.message);
+    console.error('[Prayers/Unmark] Error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

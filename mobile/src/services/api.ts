@@ -42,6 +42,10 @@ export const api = {
     return this.post(`/prayers/${deviceId}/mark`, { prayerName, status });
   },
 
+  async unmarkPrayer(deviceId: string, prayerName: string) {
+    return this.post(`/prayers/${deviceId}/unmark`, { prayerName });
+  },
+
   async getWeeklySummary(deviceId: string) {
     return this.get(`/prayers/${deviceId}/weekly`);
   },

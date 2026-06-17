@@ -2,7 +2,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } 
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../../src/services/api';
-import { scheduleAllPrayerNotifications, cancelAllNotifications, scheduleStreakCelebration } from '../../src/services/notifications';
+import { getDeviceId } from '../../src/services/identity';
+import { scheduleAllPrayerNotifications, cancelAllNotifications, scheduleGrowthMilestone } from '../../src/services/notifications';
 
 type PrayerRecord = { prayer_name: string; status: string; prayed_at: string | null };
 type PrayerTimes = Record<string, string>;
@@ -19,30 +20,33 @@ export default function PrayersScreen() {
   const [streak, setStreak] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState('');
+  const [undoTarget, setUndoTarget] = useState<string | null>(null); // prayer name available for undo
+  const [undiing, setUndiing] = useState(false); // currently performing undo
+
+  const deviceId = getDeviceId();
 
   const loadData = useCallback(async () => {
     try {
-      const result = await api.getTodayPrayers('default-device');
+      const result = await api.getTodayPrayers(deviceId);
       if (result.success) {
         setPrayers(result.data.prayers);
         setNextPrayer(result.data.nextPrayer);
         setProgress(result.data.progress);
         setStreak(result.data.streak);
 
-        // Schedule prayer notifications from the prayer times
         if (result.data.prayerTimes) {
           const times: Record<string, Date> = {};
           for (const [name, time] of Object.entries(result.data.prayerTimes)) {
             times[name] = new Date(time as string);
           }
           await cancelAllNotifications();
-          await scheduleAllPrayerNotifications(times, result.data.streak);
+          await scheduleAllPrayerNotifications(times, deviceId, result.data.streak);
         }
       }
     } catch (e) {
       // Offline
     }
-  }, []);
+  }, [deviceId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -54,19 +58,23 @@ export default function PrayersScreen() {
 
   async function markPrayer(prayerName: string) {
     try {
-      const result = await api.markPrayer('default-device', prayerName);
+      const result = await api.markPrayer(deviceId, prayerName);
       if (result.success) {
-        setMessage(result.data.message || 'MashaAllah!');
         setProgress(result.data.progress);
         setStreak(result.data.streak);
-        loadData();
+        setMessage('MashaAllah! ✓');
+
+        // Show undo button for 6 seconds
+        setUndoTarget(prayerName);
+        setTimeout(() => setUndoTarget(null), 6000);
 
         // Celebrate milestones
-        if (result.data.streak >= 3 && result.data.streak % 1 === 0) {
-          scheduleStreakCelebration(result.data.streak, prayerName);
+        if (result.data.streak >= 3) {
+          scheduleGrowthMilestone(result.data.streak, deviceId);
         }
 
-        setTimeout(() => setMessage(''), 4000);
+        setTimeout(() => setMessage(''), 3000);
+        loadData();
       }
     } catch (e) {
       setMessage('Could not connect. Will sync later.');
@@ -74,9 +82,35 @@ export default function PrayersScreen() {
     }
   }
 
+  async function undoPrayer(prayerName: string) {
+    if (undiing) return;
+    setUndiing(true);
+    try {
+      const result = await api.unmarkPrayer(deviceId, prayerName);
+      if (result.success) {
+        setProgress(result.data.progress);
+        setStreak(result.data.streak);
+        setMessage('Undone ✓');
+        setUndoTarget(null);
+        setTimeout(() => setMessage(''), 2500);
+        loadData();
+      }
+    } catch (e) {
+      setMessage('Could not undo. Try again.');
+      setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setUndiing(false);
+    }
+  }
+
   const canPray = (prayerName: string): boolean => {
     const record = prayers.find(p => p.prayer_name === prayerName);
     return record?.status === 'pending';
+  };
+
+  const isPrayed = (prayerName: string): boolean => {
+    const record = prayers.find(p => p.prayer_name === prayerName);
+    return record?.status === 'prayed';
   };
 
   return (
@@ -97,7 +131,7 @@ export default function PrayersScreen() {
         </View>
       </View>
 
-      {/* Success Message */}
+      {/* Success/Undo Message */}
       {message ? (
         <View style={styles.messageCard}>
           <Ionicons name="checkmark-circle" size={20} color="#2D6A4F" />
@@ -107,9 +141,10 @@ export default function PrayersScreen() {
 
       {/* Prayer Cards */}
       {PRAYER_NAMES.map(prayerName => {
-        const record = prayers.find(p => p.prayer_name === prayerName);
-        const isPrayed = record?.status === 'prayed';
+        const isPrayedRecord = isPrayed(prayerName);
+        const isPending = canPray(prayerName);
         const isNext = nextPrayer?.name === prayerName;
+        const isUndoable = undoTarget === prayerName;
 
         return (
           <View key={prayerName} style={[styles.prayerCard, isNext && styles.prayerCardNext]}>
@@ -119,12 +154,25 @@ export default function PrayersScreen() {
                 <Text style={styles.prayerName}>{PRAYER_LABELS[prayerName]}</Text>
                 {isNext && <Text style={styles.nextTag}>Next</Text>}
               </View>
-              {isPrayed ? (
+
+              {isPrayedRecord && !isUndoable && (
                 <View style={styles.prayedBadge}>
                   <Ionicons name="checkmark-circle" size={20} color="#2D6A4F" />
                   <Text style={styles.prayedText}>Prayed</Text>
                 </View>
-              ) : (
+              )}
+
+              {isPrayedRecord && isUndoable && (
+                <TouchableOpacity
+                  style={styles.undoButton}
+                  onPress={() => undoPrayer(prayerName)}
+                >
+                  <Ionicons name="arrow-undo" size={18} color="#fff" />
+                  <Text style={styles.undoButtonText}>Undo</Text>
+                </TouchableOpacity>
+              )}
+
+              {isPending && (
                 <TouchableOpacity
                   style={styles.markButton}
                   onPress={() => markPrayer(prayerName)}
@@ -156,108 +204,62 @@ export default function PrayersScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F0F4F0',
-  },
+  container: { flex: 1, backgroundColor: '#F0F4F0' },
   streakBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF3E0',
-    margin: 16,
-    borderRadius: 16,
-    padding: 16,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF3E0',
+    margin: 16, borderRadius: 16, padding: 16,
   },
   streakEmoji: { fontSize: 32, marginRight: 12 },
   streakLabel: { fontSize: 13, color: '#795548' },
   streakCount: { fontSize: 20, fontWeight: '700', color: '#E65100' },
   streakPercent: {
-    marginLeft: 'auto',
-    alignItems: 'center',
-    backgroundColor: 'rgba(230,81,0,0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    marginLeft: 'auto', alignItems: 'center', backgroundColor: 'rgba(230,81,0,0.1)',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12,
   },
   streakPercentText: { fontSize: 18, fontWeight: '700', color: '#E65100' },
   streakPercentSub: { fontSize: 10, color: '#795548' },
   messageCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D4EDDA',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#D4EDDA',
+    marginHorizontal: 16, marginBottom: 8, borderRadius: 12, padding: 12, gap: 8,
   },
   messageText: { flex: 1, color: '#155724', fontSize: 13 },
   prayerCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1,
+    backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 8,
+    borderRadius: 14, padding: 16,
+    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 1,
   },
   prayerCardNext: {
-    borderWidth: 1.5,
-    borderColor: '#2D6A4F',
-    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5, borderColor: '#2D6A4F', backgroundColor: '#F0FDF4',
   },
-  prayerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  prayerHeader: { flexDirection: 'row', alignItems: 'center' },
   prayerEmoji: { fontSize: 28, marginRight: 12 },
   prayerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   prayerName: { fontSize: 17, fontWeight: '600', color: '#1B4332' },
   nextTag: {
-    backgroundColor: '#2D6A4F',
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    overflow: 'hidden',
+    backgroundColor: '#2D6A4F', color: '#fff', fontSize: 10, fontWeight: '700',
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, overflow: 'hidden',
   },
   prayedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#E8F5E9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
   },
   prayedText: { color: '#2D6A4F', fontSize: 13, fontWeight: '600' },
+  undoButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#E65100', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+  },
+  undoButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   markButton: {
-    backgroundColor: '#2D6A4F',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: '#2D6A4F', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
   },
   markButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   summaryLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 14,
-    padding: 16,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    marginHorizontal: 16, marginTop: 8, borderRadius: 14, padding: 16, gap: 8,
   },
   summaryText: { flex: 1, color: '#2D6A4F', fontSize: 14, fontWeight: '500' },
   encouragementCard: {
-    backgroundColor: '#E8F5E9',
-    margin: 16,
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: '#E8F5E9', margin: 16, borderRadius: 16, padding: 20,
   },
   encouragementTitle: { fontSize: 16, fontWeight: '600', color: '#1B4332', marginBottom: 8 },
   encouragementText: { color: '#2D6A4F', fontSize: 13, lineHeight: 20 },

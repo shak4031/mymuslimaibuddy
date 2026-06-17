@@ -3,7 +3,7 @@ import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { api } from '../../src/services/api';
-import { getDeviceId } from './_layout';
+import { getDeviceId } from '../../src/services/identity';
 
 type NextPrayer = { name: string; remainingMinutes: number };
 type TodayProgress = { today: number; total: number; percentage: number };

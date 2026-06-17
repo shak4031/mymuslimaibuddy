@@ -9,11 +9,11 @@ import {
   scheduleEveningReflection,
 } from '../src/services/notifications';
 import { api } from '../src/services/api';
+import { getDeviceId } from '../src/services/identity';
 import { router } from 'expo-router';
 
-// API base URL - will be configured via env or railway URL
+// API base URL
 export const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://mymuslimaibuddy-production.up.railway.app/api/v1';
-export const getDeviceId = () => 'default-device'; // Will be replaced with expo-device ID
 
 export default function RootLayout() {
   useEffect(() => {

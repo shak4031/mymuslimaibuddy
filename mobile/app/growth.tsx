@@ -5,7 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../src/services/api';
-import { getDeviceId } from './_layout';
+import { getDeviceId } from '../src/services/identity';
 
 type GrowthOverview = {
   compositeScore: number;
